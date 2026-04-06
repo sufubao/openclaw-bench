@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenClaw Bench</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+      :root {
+        --sidebar-bg: #0f172a;
+        --sidebar-hover: #1e293b;
+        --sidebar-active: #1e293b;
+        --sidebar-border: #1e293b;
+        --sidebar-text: #94a3b8;
+        --sidebar-text-bright: #e2e8f0;
+        --sidebar-width: 280px;
+
+        --bg: #f1f5f9;
+        --surface: #ffffff;
+        --ink: #0f172a;
+        --heading: #1e293b;
+        --muted: #64748b;
+        --faint: #94a3b8;
+        --border: #e2e8f0;
+        --border-light: #f1f5f9;
+
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --accent-soft: #eef2ff;
+        --accent-glow: rgba(99, 102, 241, 0.15);
+
+        --success: #10b981;
+        --success-soft: #ecfdf5;
+        --warning: #f59e0b;
+        --warning-soft: #fffbeb;
+        --danger: #ef4444;
+        --danger-soft: #fef2f2;
+        --info: #06b6d4;
+        --info-soft: #ecfeff;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 14px;
+        color: var(--ink);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ===== SIDEBAR ===== */
+      .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        background: var(--sidebar-bg);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        overflow: hidden;
+      }
+
+      .sidebar-brand {
+        padding: 24px 20px 20px;
+        border-bottom: 1px solid var(--sidebar-border);
+      }
+
+      .sidebar-brand h1 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--sidebar-text-bright);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .sidebar-brand h1 .logo-icon {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, var(--accent), #818cf8);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+      }
+
+      .sidebar-meta {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--sidebar-border);
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .sidebar-meta .sm-badge {
+        font-size: 11px;
+        color: var(--sidebar-text);
+        background: var(--sidebar-hover);
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .sidebar-meta .sm-badge strong {
+        color: var(--sidebar-text-bright);
+        font-weight: 600;
+      }
+
+      .sidebar-section-title {
+        padding: 16px 20px 8px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--faint);
+      }
+
+      .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 8px;
+      }
+
+      .sidebar-list::-webkit-scrollbar { width: 4px; }
+      .sidebar-list::-webkit-scrollbar-track { background: transparent; }
+      .sidebar-list::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 4px; }
+
+      .sidebar-item {
+        padding: 12px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        margin-bottom: 2px;
+        border: 1px solid transparent;
+      }
+
+      .sidebar-item:hover {
+        background: var(--sidebar-hover);
+      }
+
+      .sidebar-item.active {
+        background: var(--sidebar-active);
+        border-color: var(--accent);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+
+      .sidebar-item-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--sidebar-text-bright);
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .sidebar-item-title .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--success);
+        flex-shrink: 0;
+      }
+
+      .sidebar-item-sub {
+        font-size: 11px;
+        color: var(--sidebar-text);
+        line-height: 1.5;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sidebar-item-sub span {
+        margin-right: 8px;
+      }
+
+      .sidebar-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--sidebar-border);
+      }
+
+      .sidebar-upload {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .sidebar-upload label {
+        font-size: 11px;
+        color: var(--sidebar-text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px dashed var(--sidebar-border);
+        transition: all 0.15s ease;
+      }
+
+      .sidebar-upload label:hover {
+        border-color: var(--accent);
+        color: var(--sidebar-text-bright);
+      }
+
+      .sidebar-upload input[type="file"] { display: none; }
+
+      .btn-sm {
+        background: var(--accent);
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 7px 14px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+        width: 100%;
+      }
+
+      .btn-sm:hover { background: var(--accent-hover); }
+
+      /* ===== MAIN CONTENT ===== */
+      .main {
+        flex: 1;
+        min-width: 0;
+        overflow-y: auto;
+        height: 100vh;
+      }
+
+      .main-inner {
+        padding: 32px 40px 64px;
+        max-width: 1200px;
+      }
+
+      /* ===== CONFIG HEADER ===== */
+      .config-header-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+
+      .config-header-bar h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.02em;
+      }
+
+      .config-header-bar .uuid-tag {
+        font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 5px 12px;
+        border-radius: 6px;
+        color: var(--muted);
+      }
+
+      /* ===== KPI CARDS ===== */
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+
+      .kpi-card {
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid var(--border);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+      }
+
+      .kpi-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        transform: translateY(-1px);
+      }
+
+      .kpi-card .kpi-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+
+      .kpi-card .kpi-icon.green { background: var(--success-soft); color: var(--success); }
+      .kpi-card .kpi-icon.blue { background: var(--info-soft); color: var(--info); }
+      .kpi-card .kpi-icon.amber { background: var(--warning-soft); color: var(--warning); }
+      .kpi-card .kpi-icon.red { background: var(--danger-soft); color: var(--danger); }
+      .kpi-card .kpi-icon.purple { background: var(--accent-soft); color: var(--accent); }
+
+      .kpi-card .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.02em;
+        line-height: 1;
+        margin-bottom: 4px;
+      }
+
+      .kpi-card .kpi-label {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      /* ===== CHARTS ===== */
+      .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+      }
+
+      .chart-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: box-shadow 0.2s ease;
+      }
+
+      .chart-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      }
+
+      .chart-card img {
+        width: 100%;
+        display: block;
+      }
+
+      /* ===== TABLE ===== */
+      .table-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 28px;
+      }
+
+      .table-section-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .table-section-header h3 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--heading);
+      }
+
+      .table-section-header .run-count {
+        font-size: 12px;
+        color: var(--muted);
+        background: var(--border-light);
+        padding: 3px 10px;
+        border-radius: 20px;
+      }
+
+      .table-wrap { overflow-x: auto; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th, td {
+        padding: 12px 16px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        background: var(--bg);
+        color: var(--faint);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+      }
+
+      td {
+        border-bottom: 1px solid var(--border-light);
+        color: var(--heading);
+        font-variant-numeric: tabular-nums;
+      }
+
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover td { background: var(--accent-soft); }
+
+      .cell-label {
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .cell-number {
+        font-feature-settings: "tnum";
+      }
+
+      .cell-server {
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      /* ===== ERRORS ===== */
+      .error-panel {
+        background: var(--danger-soft);
+        border: 1px solid #fecaca;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+      }
+
+      .error-panel h3 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--danger);
+        margin-bottom: 8px;
+      }
+
+      .error-panel ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .error-panel li {
+        font-size: 12px;
+        color: #991b1b;
+        padding: 4px 0;
+      }
+
+      /* ===== EMPTY STATE ===== */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .empty-state .empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.4;
+      }
+
+      .empty-state h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--heading);
+        margin-bottom: 8px;
+      }
+
+      .empty-state p {
+        font-size: 14px;
+        max-width: 400px;
+        line-height: 1.6;
+      }
+
+      /* ===== GROUP SECTIONS ===== */
+      .group-section {
+        display: none;
+      }
+
+      .group-section.active {
+        display: block;
+        animation: fadeIn 0.25s ease;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ===== RESPONSIVE ===== */
+      @media (max-width: 1024px) {
+        .charts-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 768px) {
+        .sidebar {
+          position: fixed;
+          left: -280px;
+          z-index: 100;
+          transition: left 0.3s ease;
+        }
+        .sidebar.open { left: 0; }
+        .main-inner { padding: 24px 16px 48px; }
+        .mobile-toggle {
+          display: flex !important;
+        }
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+
+      .mobile-toggle {
+        display: none;
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 101;
+        width: 40px;
+        height: 40px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 18px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Mobile toggle -->
+    <div class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h1>
+          <span class="logo-icon">OC</span>
+          OpenClaw
+        </h1>
+      </div>
+
+      <div class="sidebar-meta">
+        {% if results_dir %}
+        <span class="sm-badge">Dir <strong>{{ results_dir }}</strong></span>
+        {% endif %}
+        <span class="sm-badge">Files <strong>{{ files_loaded }}</strong></span>
+      </div>
+
+      <div class="sidebar-section-title">Configurations</div>
+
+      <div class="sidebar-list">
+        {% for group in groups %}
+        <div class="sidebar-item {% if loop.first %}active{% endif %}" onclick="selectGroup({{ loop.index0 }})" data-group="{{ loop.index0 }}">
+          <div class="sidebar-item-title">
+            <span class="dot"></span>
+            {{ group.short_uuid }}
+          </div>
+          <div class="sidebar-item-sub">
+            <span>{{ group.run_count }} run{{ "s" if group.run_count != 1 else "" }}</span>
+            <span>{{ group.servers | join(", ") }}</span>
+          </div>
+        </div>
+        {% endfor %}
+
+        {% if not groups %}
+        <div style="padding: 20px; text-align: center; color: var(--sidebar-text); font-size: 12px;">
+          No benchmark results found.<br>Upload files below.
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="sidebar-footer">
+        <form class="sidebar-upload" method="post" action="/compare" enctype="multipart/form-data" id="upload-form">
+          <label for="file-input">&#128206; Upload JSON results</label>
+          <input type="file" name="files" id="file-input" accept=".json,application/json" multiple required>
+          <button class="btn-sm" type="submit">Compare Runs</button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="main">
+      <div class="main-inner">
+        {% if errors %}
+        <div class="error-panel">
+          <h3>Import Errors</h3>
+          <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if not groups %}
+        <div class="empty-state">
+          <div class="empty-icon">&#128202;</div>
+          <h3>No Benchmark Data</h3>
+          <p>Place JSON result files in <code>./results</code> or upload them via the sidebar to start comparing runs.</p>
+        </div>
+        {% endif %}
+
+        {% for group in groups %}
+        <div class="group-section {% if loop.first %}active{% endif %}" id="group-{{ loop.index0 }}">
+
+          <!-- Config header -->
+          <div class="config-header-bar">
+            <h2>{{ group.servers | join(" vs ") }}</h2>
+            <span class="uuid-tag">{{ group.config_uuid }}</span>
+          </div>
+
+          <!-- KPI cards: pick best run for top-level KPIs -->
+          {% set row = group.rows[0] %}
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon green">&#9889;</div>
+              <div class="kpi-value">{{ row.completion_token_throughput_tps }}</div>
+              <div class="kpi-label">Tokens / sec</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon blue">&#128337;</div>
+              <div class="kpi-value">{{ row.ttft_p50 }}s</div>
+              <div class="kpi-label">TTFT p50</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon amber">&#9201;</div>
+              <div class="kpi-value">{{ row.tpot_p50 }}s</div>
+              <div class="kpi-label">TPOT p50</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon purple">&#128200;</div>
+              <div class="kpi-value">{{ row.request_throughput_rps }}</div>
+              <div class="kpi-label">Requests / sec</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon green">&#9989;</div>
+              <div class="kpi-value">{{ row.completed_requests }}</div>
+              <div class="kpi-label">Completed</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon red">&#10060;</div>
+              <div class="kpi-value">{{ row.failed_requests }}</div>
+              <div class="kpi-label">Failed</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="charts-grid">
+            {% if group.throughput_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.throughput_chart }}" alt="Throughput chart">
+            </div>
+            {% endif %}
+            {% if group.latency_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.latency_chart }}" alt="Request throughput chart">
+            </div>
+            {% endif %}
+            {% if group.ttft_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.ttft_chart }}" alt="TTFT chart">
+            </div>
+            {% endif %}
+            {% if group.tpot_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.tpot_chart }}" alt="TPOT chart">
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Detail table -->
+          <div class="table-section">
+            <div class="table-section-header">
+              <h3>Run Details</h3>
+              <span class="run-count">{{ group.rows | length }} run{{ "s" if group.rows | length != 1 else "" }}</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Server</th>
+                    <th>Run</th>
+                    <th>Model</th>
+                    <th>Completed</th>
+                    <th>Failed</th>
+                    <th>Req/s</th>
+                    <th>Tok/s</th>
+                    <th>TPM</th>
+                    <th>TTFT p50</th>
+                    <th>TTFT p90</th>
+                    <th>TTFT p99</th>
+                    <th>TPOT p50</th>
+                    <th>TPOT p90</th>
+                    <th>TPOT p99</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in group.rows %}
+                  <tr>
+                    <td class="cell-server">{{ row.server_label }}</td>
+                    <td class="cell-label">{{ row.run_label }}</td>
+                    <td>{{ row.model }}</td>
+                    <td class="cell-number">{{ row.completed_requests }}</td>
+                    <td class="cell-number">{{ row.failed_requests }}</td>
+                    <td class="cell-number">{{ row.request_throughput_rps }}</td>
+                    <td class="cell-number">{{ row.completion_token_throughput_tps }}</td>
+                    <td class="cell-number">{{ row.tpm }}</td>
+                    <td class="cell-number">{{ row.ttft_p50 }}</td>
+                    <td class="cell-number">{{ row.ttft_p90 }}</td>
+                    <td class="cell-number">{{ row.ttft_p99 }}</td>
+                    <td class="cell-number">{{ row.tpot_p50 }}</td>
+                    <td class="cell-number">{{ row.tpot_p90 }}</td>
+                    <td class="cell-number">{{ row.tpot_p99 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      function selectGroup(index) {
+        // Update sidebar
+        document.querySelectorAll('.sidebar-item').forEach(function(el) {
+          el.classList.remove('active');
+        });
+        var item = document.querySelector('.sidebar-item[data-group="' + index + '"]');
+        if (item) item.classList.add('active');
+
+        // Update main content
+        document.querySelectorAll('.group-section').forEach(function(el) {
+          el.classList.remove('active');
+        });
+        var section = document.getElementById('group-' + index);
+        if (section) section.classList.add('active');
+
+        // Close mobile sidebar
+        document.querySelector('.sidebar').classList.remove('open');
+      }
+
+      // Auto-submit upload form when files selected
+      var fileInput = document.getElementById('file-input');
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {
+          if (this.files.length > 0) {
+            document.getElementById('upload-form').submit();
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
