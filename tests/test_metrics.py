@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from openclaw_bench.metrics import describe, describe_trimmed, percentile, trim_sorted
+from openclaw_bench.metrics import busy_seconds, describe, describe_trimmed, percentile, trim_sorted
+from openclaw_bench.models import TurnResult
 
 
 def test_percentile_interpolates() -> None:
@@ -37,3 +38,29 @@ def test_describe_trimmed_excludes_extremes() -> None:
     assert summary["count"] == 16
     assert summary["min"] == 3
     assert summary["max"] == 18
+
+
+def _make_turn(start: float, end: float) -> TurnResult:
+    return TurnResult(
+        session_id="s1",
+        scenario="test",
+        turn_index=0,
+        status="completed",
+        estimated_prompt_tokens=1,
+        max_output_tokens=1,
+        started_at="t",
+        started_at_offset_seconds=start,
+        completed_at_offset_seconds=end,
+    )
+
+
+def test_busy_seconds_no_gap() -> None:
+    # Two overlapping requests: [0,10] and [5,15] → busy = 15s
+    results = [_make_turn(0, 10), _make_turn(5, 15)]
+    assert busy_seconds(results) == 15.0
+
+
+def test_busy_seconds_with_gap() -> None:
+    # Two requests with a gap: [0,5] and [10,20] → busy = 15s (gap excluded)
+    results = [_make_turn(0, 5), _make_turn(10, 20)]
+    assert busy_seconds(results) == 15.0

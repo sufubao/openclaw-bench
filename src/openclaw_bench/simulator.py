@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 from tqdm.auto import tqdm
 
-from openclaw_bench.metrics import describe, describe_trimmed, peak_concurrency
+from openclaw_bench.metrics import busy_seconds, describe, describe_trimmed, peak_concurrency
 from openclaw_bench.models import BenchmarkResult, SessionPlan, SessionResult, SimulationConfig, TurnResult
 from openclaw_bench.tokenizer import build_tokenizer
 
@@ -335,6 +335,9 @@ class SimulationRunner:
         latency_values = [result.total_latency_seconds for result in completed if result.total_latency_seconds is not None]
         duration = max(duration_seconds, 1e-9)
 
+        # Server-busy time: wall-clock seconds where >= 1 request was in-flight.
+        busy = max(busy_seconds(self.request_results), 1e-9)
+
         trim_frac = self.config.trim_percent / 100.0
 
         # Build the trimmed request set (middle portion by total latency).
@@ -344,21 +347,20 @@ class SimulationRunner:
         tr_ttft = [r.ttft_seconds for r in trimmed_results if r.ttft_seconds is not None]
         tr_tpot = [r.tpot_seconds for r in trimmed_results if r.tpot_seconds is not None]
         tr_latency = [r.total_latency_seconds for r in trimmed_results if r.total_latency_seconds is not None]
-
-        # Time span of the trimmed set for throughput calculation.
-        tr_starts = [r.started_at_offset_seconds for r in trimmed_results]
-        tr_ends = [r.completed_at_offset_seconds for r in trimmed_results if r.completed_at_offset_seconds is not None]
-        tr_span = max((max(tr_ends) - min(tr_starts)) if tr_starts and tr_ends else duration, 1e-9)
+        tr_busy = max(busy_seconds(trimmed_results), 1e-9)
 
         return {
             "planned_requests": sum(len(session.turns) for session in self.config.users),
             "completed_requests": len(completed),
             "failed_requests": len(self.request_results) - len(completed),
             "completed_sessions": sum(1 for session in self.session_results if session.failed_turns == 0),
-            "request_throughput_rps": len(completed) / duration,
-            "request_throughput_rpm": (len(completed) / duration) * 60.0,
-            "prompt_token_throughput_tps": sum(prompt_tokens) / duration,
-            "completion_token_throughput_tps": sum(completion_tokens) / duration,
+            "duration_seconds": duration,
+            "busy_seconds": busy,
+            "request_throughput_rps": len(completed) / busy,
+            "request_throughput_rpm": (len(completed) / busy) * 60.0,
+            "prompt_token_throughput_tps": sum(prompt_tokens) / busy,
+            "completion_token_throughput_tps": sum(completion_tokens) / busy,
+            "total_token_throughput_tps": (sum(prompt_tokens) + sum(completion_tokens)) / busy,
             "peak_inflight_requests": peak_concurrency(self.request_results),
             "ttft_seconds": describe(ttft_values),
             "tpot_seconds": describe(tpot_values),
@@ -369,10 +371,12 @@ class SimulationRunner:
                 "trim_percent": self.config.trim_percent,
                 "included_requests": len(trimmed_results),
                 "excluded_requests": len(completed) - len(trimmed_results),
-                "request_throughput_rps": len(trimmed_results) / tr_span,
-                "request_throughput_rpm": (len(trimmed_results) / tr_span) * 60.0,
-                "prompt_token_throughput_tps": sum(tr_prompt) / tr_span,
-                "completion_token_throughput_tps": sum(tr_completion) / tr_span,
+                "busy_seconds": tr_busy,
+                "request_throughput_rps": len(trimmed_results) / tr_busy,
+                "request_throughput_rpm": (len(trimmed_results) / tr_busy) * 60.0,
+                "prompt_token_throughput_tps": sum(tr_prompt) / tr_busy,
+                "completion_token_throughput_tps": sum(tr_completion) / tr_busy,
+                "total_token_throughput_tps": (sum(tr_prompt) + sum(tr_completion)) / tr_busy,
                 "ttft_seconds": describe(tr_ttft),
                 "tpot_seconds": describe(tr_tpot),
                 "total_latency_seconds": describe(tr_latency),

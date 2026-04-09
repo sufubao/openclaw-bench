@@ -73,7 +73,7 @@ def report(results_dir: Path) -> None:
         return
 
     # ── overview table ────────────────────────────────────────────────────
-    overview_cols = ["File", "Server", "Run", "Duration", "Reqs", "Fail", "Peak"]
+    overview_cols = ["File", "Server", "Run", "Duration", "Busy", "Reqs", "Fail", "Peak"]
     overview_rows = []
     for fname, data in results:
         s = data["summary"]
@@ -82,27 +82,27 @@ def report(results_dir: Path) -> None:
             data.get("server_label", "-"),
             data.get("run_label", "-"),
             _fmt(data.get("duration_seconds"), 0, "s"),
+            _fmt(s.get("busy_seconds"), 0, "s"),
             str(s.get("completed_requests", 0)),
             str(s.get("failed_requests", 0)),
             str(s.get("peak_inflight_requests", "-")),
         ])
     _print_table("Overview", overview_cols, overview_rows)
 
-    # ── throughput table ──────────────────────────────────────────────────
-    tp_cols = ["File", "Req/s", "Req/m", "Compl tok/s", "Compl tok/m", "Prompt tok/s"]
+    # ── throughput table (based on server-busy time) ─────────────────────
+    tp_cols = ["File", "TPS (in+out)", "In TPS", "Out TPS", "Out TPM", "Req/s"]
     tp_rows = []
     for fname, data in results:
         s = data["summary"]
-        ctps = s.get("completion_token_throughput_tps")
         tp_rows.append([
             fname,
+            _fmt(s.get("total_token_throughput_tps"), 1),
+            _fmt(s.get("prompt_token_throughput_tps"), 1),
+            _fmt(s.get("completion_token_throughput_tps"), 1),
+            _fmt((s.get("completion_token_throughput_tps") or 0) * 60, 0),
             _fmt(s.get("request_throughput_rps")),
-            _fmt(s.get("request_throughput_rpm"), 0),
-            _fmt(ctps),
-            _fmt(ctps * 60 if ctps else None, 0),
-            _fmt(s.get("prompt_token_throughput_tps"), 0),
         ])
-    _print_table("Throughput", tp_cols, tp_rows)
+    _print_table("Throughput (server-busy time only)", tp_cols, tp_rows)
 
     # ── latency table ─────────────────────────────────────────────────────
     lat_cols = ["File", "TTFT p50", "TTFT p90", "TTFT p99", "TPOT p50", "TPOT p90", "Latency p50"]
@@ -126,7 +126,7 @@ def report(results_dir: Path) -> None:
     # ── trimmed table (if any result has it) ──────────────────────────────
     has_trimmed = any(data["summary"].get("trimmed") for _, data in results)
     if has_trimmed:
-        tr_cols = ["File", "Trim%", "Included", "Compl tok/s", "TTFT p50", "TTFT p90", "TPOT p50", "TPOT p90"]
+        tr_cols = ["File", "Trim%", "Included", "TPS (in+out)", "Out TPS", "TTFT p50", "TTFT p90", "TPOT p50", "TPOT p90"]
         tr_rows = []
         for fname, data in results:
             tr = data["summary"].get("trimmed")
@@ -139,13 +139,14 @@ def report(results_dir: Path) -> None:
                 fname,
                 _fmt(tr.get("trim_percent"), 0, "%"),
                 str(tr.get("included_requests", "-")),
-                _fmt(tr.get("completion_token_throughput_tps")),
+                _fmt(tr.get("total_token_throughput_tps"), 1),
+                _fmt(tr.get("completion_token_throughput_tps"), 1),
                 _fmt(tr_ttft.get("p50"), 3, "s"),
                 _fmt(tr_ttft.get("p90"), 3, "s"),
                 _fmt(tr_tpot.get("p50"), 4, "s"),
                 _fmt(tr_tpot.get("p90"), 4, "s"),
             ])
-        _print_table("Trimmed Metrics (middle 80%)", tr_cols, tr_rows)
+        _print_table("Trimmed Metrics (middle 80%, server-busy time)", tr_cols, tr_rows)
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
