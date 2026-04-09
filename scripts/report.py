@@ -90,17 +90,21 @@ def report(results_dir: Path) -> None:
     _print_table("Overview", overview_cols, overview_rows)
 
     # ── throughput table (based on server-busy time) ─────────────────────
-    tp_cols = ["File", "TPS (in+out)", "In TPS", "Out TPS", "Out TPM", "Req/s"]
+    dur_key = "duration_seconds"  # wall-clock for RPM
+    tp_cols = ["File", "RPM", "TPS (in+out)", "In TPS", "Out TPS", "Out TPM"]
     tp_rows = []
     for fname, data in results:
         s = data["summary"]
+        dur = data.get(dur_key) or s.get(dur_key) or 1
+        completed = s.get("completed_requests", 0)
+        rpm = completed / dur * 60
         tp_rows.append([
             fname,
+            _fmt(rpm, 0),
             _fmt(s.get("total_token_throughput_tps"), 1),
             _fmt(s.get("prompt_token_throughput_tps"), 1),
             _fmt(s.get("completion_token_throughput_tps"), 1),
             _fmt((s.get("completion_token_throughput_tps") or 0) * 60, 0),
-            _fmt(s.get("request_throughput_rps")),
         ])
     _print_table("Throughput (server-busy time only)", tp_cols, tp_rows)
 
