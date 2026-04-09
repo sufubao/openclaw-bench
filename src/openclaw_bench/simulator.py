@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 from tqdm.auto import tqdm
 
-from openclaw_bench.metrics import describe, peak_concurrency
+from openclaw_bench.metrics import describe, describe_trimmed, peak_concurrency
 from openclaw_bench.models import BenchmarkResult, SessionPlan, SessionResult, SimulationConfig, TurnResult
 from openclaw_bench.tokenizer import build_tokenizer
 
@@ -68,15 +68,19 @@ class SimulationRunner:
             headers["Authorization"] = f"Bearer {self.api_key}"
         timeout = httpx.Timeout(timeout=self.config.request.timeout_seconds, connect=self.config.request.timeout_seconds)
         planned_requests = sum(len(session.turns) for session in self.config.users)
-        with tqdm(total=planned_requests, desc="simulate", unit="req", disable=None) as progress:
-            self._progress_bar = progress
-            try:
-                async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+        async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+            await self._run_warmup(client)
+            # Reset timing so warmup does not count toward metrics.
+            self.run_started_wall = utc_now_iso()
+            self.run_started_perf = time.perf_counter()
+            with tqdm(total=planned_requests, desc="simulate", unit="req", disable=None) as progress:
+                self._progress_bar = progress
+                try:
                     tasks = [asyncio.create_task(self._run_session(client, session)) for session in self.config.users]
                     if tasks:
                         await asyncio.gather(*tasks)
-            finally:
-                self._progress_bar = None
+                finally:
+                    self._progress_bar = None
 
         completed_at = utc_now_iso()
         duration_seconds = max(time.perf_counter() - self.run_started_perf, 0.0)
@@ -136,6 +140,38 @@ class SimulationRunner:
         if amount <= 0 or self._progress_bar is None:
             return
         self._progress_bar.update(amount)
+
+    async def _run_warmup(self, client: httpx.AsyncClient) -> None:
+        warmup = self.config.warmup
+        if warmup.num_requests <= 0:
+            return
+        print(f"[warmup] sending {warmup.num_requests} requests (concurrency={warmup.max_concurrency}) ...")
+        semaphore = asyncio.Semaphore(warmup.max_concurrency)
+        completed = 0
+        failed = 0
+
+        async def _single(index: int) -> None:
+            nonlocal completed, failed
+            payload: dict[str, Any] = {
+                "model": self.config.request.model,
+                "messages": [{"role": "user", "content": warmup.prompt}],
+                "max_tokens": warmup.max_tokens,
+                "stream": False,
+                **self.config.request.extra_body,
+            }
+            async with semaphore:
+                try:
+                    resp = await client.post(self.endpoint, json=payload)
+                    if resp.status_code < 400:
+                        completed += 1
+                    else:
+                        failed += 1
+                except Exception:
+                    failed += 1
+
+        tasks = [asyncio.create_task(_single(i)) for i in range(warmup.num_requests)]
+        await asyncio.gather(*tasks)
+        print(f"[warmup] done — {completed} ok, {failed} failed")
 
     async def _execute_turn(
         self,
@@ -298,6 +334,22 @@ class SimulationRunner:
         tpot_values = [result.tpot_seconds for result in completed if result.tpot_seconds is not None]
         latency_values = [result.total_latency_seconds for result in completed if result.total_latency_seconds is not None]
         duration = max(duration_seconds, 1e-9)
+
+        trim_frac = self.config.trim_percent / 100.0
+
+        # Build the trimmed request set (middle portion by total latency).
+        trimmed_results = self._trim_requests_by_latency(completed, trim_frac)
+        tr_prompt = [float(r.actual_prompt_tokens or r.estimated_prompt_tokens) for r in trimmed_results]
+        tr_completion = [float(r.actual_completion_tokens or 0) for r in trimmed_results]
+        tr_ttft = [r.ttft_seconds for r in trimmed_results if r.ttft_seconds is not None]
+        tr_tpot = [r.tpot_seconds for r in trimmed_results if r.tpot_seconds is not None]
+        tr_latency = [r.total_latency_seconds for r in trimmed_results if r.total_latency_seconds is not None]
+
+        # Time span of the trimmed set for throughput calculation.
+        tr_starts = [r.started_at_offset_seconds for r in trimmed_results]
+        tr_ends = [r.completed_at_offset_seconds for r in trimmed_results if r.completed_at_offset_seconds is not None]
+        tr_span = max((max(tr_ends) - min(tr_starts)) if tr_starts and tr_ends else duration, 1e-9)
+
         return {
             "planned_requests": sum(len(session.turns) for session in self.config.users),
             "completed_requests": len(completed),
@@ -313,7 +365,34 @@ class SimulationRunner:
             "total_latency_seconds": describe(latency_values),
             "prompt_tokens": describe(prompt_tokens),
             "completion_tokens": describe(completion_tokens),
+            "trimmed": {
+                "trim_percent": self.config.trim_percent,
+                "included_requests": len(trimmed_results),
+                "excluded_requests": len(completed) - len(trimmed_results),
+                "request_throughput_rps": len(trimmed_results) / tr_span,
+                "request_throughput_rpm": (len(trimmed_results) / tr_span) * 60.0,
+                "prompt_token_throughput_tps": sum(tr_prompt) / tr_span,
+                "completion_token_throughput_tps": sum(tr_completion) / tr_span,
+                "ttft_seconds": describe(tr_ttft),
+                "tpot_seconds": describe(tr_tpot),
+                "total_latency_seconds": describe(tr_latency),
+                "prompt_tokens": describe(tr_prompt),
+                "completion_tokens": describe(tr_completion),
+            },
         }
+
+    @staticmethod
+    def _trim_requests_by_latency(completed: list[TurnResult], trim_fraction: float) -> list[TurnResult]:
+        """Return the middle portion of *completed* requests sorted by total latency."""
+        if not completed or trim_fraction <= 0:
+            return completed
+        by_latency = sorted(completed, key=lambda r: r.total_latency_seconds or 0.0)
+        n = len(by_latency)
+        lower = int(n * trim_fraction)
+        upper = n - int(n * trim_fraction)
+        if lower >= upper:
+            return completed
+        return by_latency[lower:upper]
 
 
 async def simulate_config(
@@ -352,7 +431,8 @@ def resolve_api_key(explicit_key: str | None = None, env_var: str = "OPENAI_API_
     return None
 
 
-def write_result(result: BenchmarkResult, output_path: str | Path) -> Path:
+def write_result(result: BenchmarkResult, output_path: str | Path, full: bool = False) -> Path:
     output = Path(output_path)
-    output.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+    exclude = None if full else {"request_results": True, "session_results": True}
+    output.write_text(result.model_dump_json(indent=2, exclude=exclude), encoding="utf-8")
     return output

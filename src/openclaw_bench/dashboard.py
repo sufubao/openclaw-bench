@@ -139,6 +139,18 @@ def _build_groups(results: list[tuple[str, BenchmarkResult]]) -> list[dict[str, 
                     title="Request Throughput",
                     ylabel="requests / second",
                 ),
+                "tr_throughput_chart": _trimmed_bar_chart(
+                    group_results,
+                    metric_key="completion_token_throughput_tps",
+                    title="Trimmed Completion Token Throughput",
+                    ylabel="tokens / second",
+                ),
+                "tr_ttft_chart": _trimmed_percentile_chart(
+                    group_results,
+                    metric_group="ttft_seconds",
+                    title="Trimmed TTFT Percentiles",
+                    ylabel="seconds",
+                ),
             }
         )
     return rendered_groups
@@ -147,6 +159,10 @@ def _build_groups(results: list[tuple[str, BenchmarkResult]]) -> list[dict[str, 
 def _summary_row(filename: str, result: BenchmarkResult) -> dict[str, Any]:
     ttft = result.summary.get("ttft_seconds", {})
     tpot = result.summary.get("tpot_seconds", {})
+    trimmed = result.summary.get("trimmed", {})
+    tr_ttft = trimmed.get("ttft_seconds", {})
+    tr_tpot = trimmed.get("tpot_seconds", {})
+    tr_tps = trimmed.get("completion_token_throughput_tps")
     return {
         "filename": filename,
         "run_label": result.run_label,
@@ -168,6 +184,17 @@ def _summary_row(filename: str, result: BenchmarkResult) -> dict[str, Any]:
         "tpot_p50": _fmt(tpot.get("p50")),
         "tpot_p90": _fmt(tpot.get("p90")),
         "tpot_p99": _fmt(tpot.get("p99")),
+        # Trimmed (middle-80 %) metrics
+        "trim_percent": trimmed.get("trim_percent"),
+        "tr_included": trimmed.get("included_requests"),
+        "tr_tps": _fmt(tr_tps),
+        "tr_tpm": _fmt(tr_tps * 60 if tr_tps else None),
+        "tr_ttft_p50": _fmt(tr_ttft.get("p50")),
+        "tr_ttft_p90": _fmt(tr_ttft.get("p90")),
+        "tr_ttft_p99": _fmt(tr_ttft.get("p99")),
+        "tr_tpot_p50": _fmt(tr_tpot.get("p50")),
+        "tr_tpot_p90": _fmt(tr_tpot.get("p90")),
+        "tr_tpot_p99": _fmt(tr_tpot.get("p99")),
     }
 
 
@@ -230,6 +257,65 @@ def _bar_chart(
     ax.set_ylabel(ylabel, fontsize=10, color="#64748b")
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=10)
+    fig.tight_layout()
+    return _chart_to_base64()
+
+
+def _trimmed_bar_chart(
+    results: list[tuple[str, BenchmarkResult]],
+    metric_key: str,
+    title: str,
+    ylabel: str,
+) -> str | None:
+    """Bar chart reading from summary['trimmed'][metric_key]."""
+    labels = [f"{result.server_label}\n{result.run_label}" for _, result in results]
+    values = [float((result.summary.get("trimmed") or {}).get(metric_key, 0.0) or 0.0) for _, result in results]
+    if not any(values):
+        return None
+    _apply_chart_style()
+    fig, ax = plt.subplots(figsize=(7, 3.5))
+    colors = [_CHART_BAR_COLORS[i % len(_CHART_BAR_COLORS)] for i in range(len(labels))]
+    bars = ax.bar(labels, values, color=colors, alpha=0.9, width=0.55, edgecolor="white", linewidth=1.5)
+    ax.bar_label(bars, fmt="%.1f", fontsize=9, color="#475569", padding=6)
+    ax.set_title(title, fontsize=13, fontweight=600, color="#1e293b", pad=14, loc="left")
+    ax.set_ylabel(ylabel, fontsize=10, color="#64748b")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=10)
+    fig.tight_layout()
+    return _chart_to_base64()
+
+
+def _trimmed_percentile_chart(
+    results: list[tuple[str, BenchmarkResult]],
+    metric_group: str,
+    title: str,
+    ylabel: str,
+) -> str | None:
+    """Percentile chart reading from summary['trimmed'][metric_group]."""
+    _apply_chart_style()
+    fig, ax = plt.subplots(figsize=(7, 3.5))
+    plotted = False
+    for idx, (_, result) in enumerate(results):
+        metrics = (result.summary.get("trimmed") or {}).get(metric_group, {})
+        ys = [metrics.get(f"p{p}") for p in PERCENTILES]
+        if not any(v is not None for v in ys):
+            continue
+        plotted = True
+        color = _CHART_PALETTE[idx % len(_CHART_PALETTE)]
+        ax.plot(
+            list(PERCENTILES),
+            [float(v or 0.0) for v in ys],
+            marker="o", markersize=5, linewidth=2.2, color=color,
+            label=f"{result.server_label} | {result.run_label}", zorder=3,
+        )
+    if not plotted:
+        plt.close()
+        return None
+    ax.set_title(title, fontsize=13, fontweight=600, color="#1e293b", pad=14, loc="left")
+    ax.set_xlabel("Percentile", fontsize=10, color="#64748b")
+    ax.set_ylabel(ylabel, fontsize=10, color="#64748b")
+    ax.set_xticks(list(PERCENTILES))
+    ax.legend(frameon=True, framealpha=0.95, edgecolor="#e2e8f0", fontsize=9, fancybox=True)
     fig.tight_layout()
     return _chart_to_base64()
 

@@ -126,6 +126,8 @@ def generate_config(control: GenerationInput) -> SimulationConfig:
         tokenizer=control.tokenizer,
         request=control.request,
         workload=control.workload,
+        warmup=control.warmup,
+        trim_percent=control.trim_percent,
         system_prompt=system_prompt,
         system_prompt_tokens=system_prompt_tokens,
         users=users,

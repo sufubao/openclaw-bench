@@ -36,6 +36,24 @@ def describe(values: list[float]) -> dict[str, float | int]:
     return summary
 
 
+def trim_sorted(ordered: list[float], trim_fraction: float) -> list[float]:
+    """Drop the bottom and top *trim_fraction* of a **pre-sorted** list."""
+    if not ordered or trim_fraction <= 0:
+        return ordered
+    n = len(ordered)
+    lower = int(n * trim_fraction)
+    upper = n - int(n * trim_fraction)
+    if lower >= upper:
+        return ordered
+    return ordered[lower:upper]
+
+
+def describe_trimmed(values: list[float], trim_fraction: float = 0.1) -> dict[str, float | int]:
+    """``describe()`` after removing the fastest *trim_fraction* and slowest *trim_fraction*."""
+    trimmed = trim_sorted(sorted(values), trim_fraction)
+    return describe(trimmed)
+
+
 def peak_concurrency(request_results: list[TurnResult]) -> int:
     events: list[tuple[float, int]] = []
     for result in request_results:

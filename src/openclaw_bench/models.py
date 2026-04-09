@@ -96,11 +96,20 @@ class WorkloadControls(StrictModel):
     max_turns_per_user: int | None = Field(default=None, gt=0)
 
 
+class WarmupConfig(StrictModel):
+    num_requests: int = Field(default=0, ge=0)
+    max_concurrency: int = Field(default=16, gt=0)
+    prompt: str = "Say hello briefly."
+    max_tokens: int = Field(default=16, gt=0)
+
+
 class GenerationInput(StrictModel):
     seed: int = 42
     tokenizer: TokenizerSpec = Field(default_factory=TokenizerSpec)
     request: RequestTemplate
     workload: WorkloadControls
+    warmup: WarmupConfig = Field(default_factory=WarmupConfig)
+    trim_percent: float = Field(default=10.0, ge=0, lt=50)
     system_prompt: str | None = None
     system_prompt_path: str | None = None
 
@@ -140,6 +149,8 @@ class SimulationConfig(StrictModel):
     tokenizer: TokenizerSpec
     request: RequestTemplate
     workload: WorkloadControls
+    warmup: WarmupConfig = Field(default_factory=WarmupConfig)
+    trim_percent: float = Field(default=10.0, ge=0, lt=50)
     system_prompt: str
     system_prompt_tokens: int = Field(gt=0)
     users: list[SessionPlan]

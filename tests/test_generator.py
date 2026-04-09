@@ -7,6 +7,7 @@ from openclaw_bench.models import (
     NumericDistribution,
     RequestTemplate,
     TokenizerSpec,
+    WarmupConfig,
     WorkloadControls,
 )
 from openclaw_bench.tokenizer import build_tokenizer
@@ -17,6 +18,8 @@ def build_control() -> GenerationInput:
         seed=7,
         tokenizer=TokenizerSpec(kind="regex"),
         request=RequestTemplate(model="openai/gpt-4.1-mini"),
+        warmup=WarmupConfig(num_requests=8, max_concurrency=4),
+        trim_percent=10.0,
         workload=WorkloadControls(
             total_users=4,
             arrival=ArrivalConfig(kind="poisson", users_per_minute=30),
@@ -48,6 +51,14 @@ def test_config_respects_context_threshold() -> None:
     for session in config.users:
         for turn in session.turns:
             assert turn.estimated_prompt_tokens < threshold
+
+
+def test_warmup_and_trim_propagate_to_config() -> None:
+    control = build_control()
+    config = generate_config(control)
+    assert config.warmup.num_requests == 8
+    assert config.warmup.max_concurrency == 4
+    assert config.trim_percent == 10.0
 
 
 def test_config_token_estimates_match_chat_estimator() -> None:

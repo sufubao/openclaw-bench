@@ -37,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
     simulate_parser.add_argument("--server-label", default="vllm-local", help="Label used when comparing result files")
     simulate_parser.add_argument("--http-referer", help="Optional OpenRouter HTTP-Referer header")
     simulate_parser.add_argument("--title", help="Optional OpenRouter X-Title header")
+    simulate_parser.add_argument(
+        "--full-output",
+        action="store_true",
+        default=False,
+        help="Include per-request and per-session results in the output JSON (large). Default: metrics-only.",
+    )
 
     dashboard_parser = subparsers.add_parser("serve-dashboard", help="Launch the local comparison dashboard")
     dashboard_parser.add_argument("--host", default="127.0.0.1")
@@ -74,7 +80,7 @@ def main() -> None:
                 extra_headers=headers,
             )
         )
-        output = write_result(result, args.output)
+        output = write_result(result, args.output, full=args.full_output)
         print(f"wrote result {result.run_uuid} to {output}")
         return
 

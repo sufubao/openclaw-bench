@@ -621,23 +621,23 @@
             <span class="uuid-tag">{{ group.config_uuid }}</span>
           </div>
 
-          <!-- KPI cards: pick best run for top-level KPIs -->
+          <!-- KPI cards: use trimmed (middle-80%) values when available -->
           {% set row = group.rows[0] %}
           <div class="kpi-grid">
             <div class="kpi-card">
               <div class="kpi-icon green">&#9889;</div>
-              <div class="kpi-value">{{ row.completion_token_throughput_tps }}</div>
-              <div class="kpi-label">Tokens / sec</div>
+              <div class="kpi-value">{{ row.tr_tps if row.tr_tps != '-' else row.completion_token_throughput_tps }}</div>
+              <div class="kpi-label">Tokens / sec {{ "(trimmed)" if row.tr_tps != '-' else "" }}</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-icon blue">&#128337;</div>
-              <div class="kpi-value">{{ row.ttft_p50 }}s</div>
-              <div class="kpi-label">TTFT p50</div>
+              <div class="kpi-value">{{ row.tr_ttft_p50 if row.tr_ttft_p50 != '-' else row.ttft_p50 }}s</div>
+              <div class="kpi-label">TTFT p50 {{ "(trimmed)" if row.tr_ttft_p50 != '-' else "" }}</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-icon amber">&#9201;</div>
-              <div class="kpi-value">{{ row.tpot_p50 }}s</div>
-              <div class="kpi-label">TPOT p50</div>
+              <div class="kpi-value">{{ row.tr_tpot_p50 if row.tr_tpot_p50 != '-' else row.tpot_p50 }}s</div>
+              <div class="kpi-label">TPOT p50 {{ "(trimmed)" if row.tr_tpot_p50 != '-' else "" }}</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-icon purple">&#128200;</div>
@@ -680,10 +680,68 @@
             {% endif %}
           </div>
 
+          <!-- Trimmed charts -->
+          <div class="charts-grid">
+            {% if group.tr_throughput_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.tr_throughput_chart }}" alt="Trimmed throughput chart">
+            </div>
+            {% endif %}
+            {% if group.tr_ttft_chart %}
+            <div class="chart-card">
+              <img src="data:image/png;base64,{{ group.tr_ttft_chart }}" alt="Trimmed TTFT chart">
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Trimmed detail table -->
+          <div class="table-section">
+            <div class="table-section-header">
+              <h3>Trimmed Metrics (middle {{ group.rows[0].trim_percent or 80 }}%)</h3>
+              <span class="run-count">{{ group.rows | length }} run{{ "s" if group.rows | length != 1 else "" }}</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Server</th>
+                    <th>Run</th>
+                    <th>Included</th>
+                    <th>Tok/s</th>
+                    <th>TPM</th>
+                    <th>TTFT p50</th>
+                    <th>TTFT p90</th>
+                    <th>TTFT p99</th>
+                    <th>TPOT p50</th>
+                    <th>TPOT p90</th>
+                    <th>TPOT p99</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in group.rows %}
+                  <tr>
+                    <td class="cell-server">{{ row.server_label }}</td>
+                    <td class="cell-label">{{ row.run_label }}</td>
+                    <td class="cell-number">{{ row.tr_included or "-" }}</td>
+                    <td class="cell-number">{{ row.tr_tps }}</td>
+                    <td class="cell-number">{{ row.tr_tpm }}</td>
+                    <td class="cell-number">{{ row.tr_ttft_p50 }}</td>
+                    <td class="cell-number">{{ row.tr_ttft_p90 }}</td>
+                    <td class="cell-number">{{ row.tr_ttft_p99 }}</td>
+                    <td class="cell-number">{{ row.tr_tpot_p50 }}</td>
+                    <td class="cell-number">{{ row.tr_tpot_p90 }}</td>
+                    <td class="cell-number">{{ row.tr_tpot_p99 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Detail table -->
           <div class="table-section">
             <div class="table-section-header">
-              <h3>Run Details</h3>
+              <h3>Run Details (all requests)</h3>
               <span class="run-count">{{ group.rows | length }} run{{ "s" if group.rows | length != 1 else "" }}</span>
             </div>
             <div class="table-wrap">
