@@ -10,28 +10,20 @@
     "top_p": 0.95,
     "max_retries": 0,
     "timeout_seconds": 600,
-    "headers": {},
-    "extra_body": {"enable_thinking": false}
+    "headers": {}
   },
-  "warmup": {
-    "num_requests": 64,
-    "max_concurrency": 32,
-    "prompt": "Say hello briefly.",
-    "max_tokens": 16
-  },
-  "trim_percent": 10,
   "workload": {
-    "total_users": 128,
+    "total_users": 1000,
     "arrival": {
       "kind": "poisson",
-      "users_per_minute": 10000
+      "users_per_minute": 32
     },
     "think_time_seconds": {
       "kind": "lognormal",
-      "mean": 8,
-      "stdev": 6,
+      "mean": 5,
+      "stdev": 2,
       "clip_min": 2,
-      "clip_max": 30
+      "clip_max": 10
     },
     "initial_user_tokens": {
       "kind": "triangular",

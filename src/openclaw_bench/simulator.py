@@ -57,6 +57,7 @@ class SimulationRunner:
         self.session_results: list[SessionResult] = []
         self._request_lock = asyncio.Lock()
         self._progress_bar: Any | None = None
+        self._total_tokens: int = 0
 
     async def run(self) -> BenchmarkResult:
         headers = {
@@ -110,7 +111,8 @@ class SimulationRunner:
             result = await self._execute_turn(client, session, turn.turn_index, turn.estimated_prompt_tokens, turn.max_output_tokens, messages)
             async with self._request_lock:
                 self.request_results.append(result)
-                self._advance_progress_unlocked(1)
+                prompt_tok = result.actual_prompt_tokens or result.estimated_prompt_tokens or 0
+                self._advance_progress_unlocked(1, prompt_tok + (result.actual_completion_tokens or 0))
             if result.status != "completed":
                 failed_turns += 1
                 break
@@ -136,9 +138,13 @@ class SimulationRunner:
             )
         )
 
-    def _advance_progress_unlocked(self, amount: int) -> None:
+    def _advance_progress_unlocked(self, amount: int, total_tokens: int = 0) -> None:
         if amount <= 0 or self._progress_bar is None:
             return
+        self._total_tokens += total_tokens
+        elapsed = max(time.perf_counter() - self.run_started_perf, 1e-9)
+        tpm = (self._total_tokens / elapsed) * 60.0
+        self._progress_bar.set_postfix(TPM=f"{tpm:.0f}", refresh=False)
         self._progress_bar.update(amount)
 
     async def _run_warmup(self, client: httpx.AsyncClient) -> None:

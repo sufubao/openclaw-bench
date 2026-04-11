@@ -162,7 +162,7 @@ def _summary_row(filename: str, result: BenchmarkResult) -> dict[str, Any]:
     trimmed = result.summary.get("trimmed", {})
     tr_ttft = trimmed.get("ttft_seconds", {})
     tr_tpot = trimmed.get("tpot_seconds", {})
-    tr_tps = trimmed.get("completion_token_throughput_tps")
+    tr_tps = trimmed.get("total_token_throughput_tps")
     return {
         "filename": filename,
         "run_label": result.run_label,
@@ -174,10 +174,12 @@ def _summary_row(filename: str, result: BenchmarkResult) -> dict[str, Any]:
         "request_throughput_rps": _fmt(result.summary.get("request_throughput_rps")),
         "completion_token_throughput_tps": _fmt(result.summary.get("completion_token_throughput_tps")),
         "tpm": _fmt(
-            (result.summary.get("completion_token_throughput_tps") or 0) * 60
-            if result.summary.get("completion_token_throughput_tps") is not None
+            (result.summary.get("total_token_throughput_tps") or 0) * 60
+            if result.summary.get("total_token_throughput_tps") is not None
             else None
         ),
+        "ttft_p5": _fmt(ttft.get("p5")),
+        "ttft_p10": _fmt(ttft.get("p10")),
         "ttft_p50": _fmt(ttft.get("p50")),
         "ttft_p90": _fmt(ttft.get("p90")),
         "ttft_p99": _fmt(ttft.get("p99")),

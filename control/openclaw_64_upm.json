@@ -10,21 +10,20 @@
     "top_p": 0.95,
     "max_retries": 0,
     "timeout_seconds": 600,
-    "headers": {},
-    "extra_body": {"enable_thinking": false}
+    "headers": {}
   },
   "workload": {
-    "total_users": 100,
+    "total_users": 1000,
     "arrival": {
       "kind": "poisson",
-      "users_per_minute": 1000
+      "users_per_minute": 64
     },
     "think_time_seconds": {
       "kind": "lognormal",
-      "mean": 25,
-      "stdev": 20,
-      "clip_min": 5,
-      "clip_max": 120
+      "mean": 5,
+      "stdev": 2,
+      "clip_min": 2,
+      "clip_max": 10
     },
     "initial_user_tokens": {
       "kind": "triangular",

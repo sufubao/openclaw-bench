@@ -1,24 +1,40 @@
 #!/usr/bin/env bash
-# Run a benchmark for one concurrency profile.
-#
-# Usage:
-#   bash scripts/simulate.sh c64              # uses configs/openclaw_c64.json
-#   bash scripts/simulate.sh c128 my-server   # custom server label
 set -euo pipefail
 
-PROFILE="${1:?usage: simulate.sh <profile> [server-label]}"
-SERVER_LABEL="${2:-lightllm}"
-CONFIG="configs/openclaw_${PROFILE}.json"
+usage() {
+    echo "Usage: $0 --config <path> [--port <port>] [--server-tag <label>]"
+    echo ""
+    echo "  --config      Path to the simulation config JSON (required)"
+    echo "  --port        Port of the local server (default: 8000)"
+    echo "  --server-tag  Label for this server (default: vllm-local)"
+    exit 1
+}
 
-if [ ! -f "$CONFIG" ]; then
-  echo "error: config not found: $CONFIG"
-  echo "hint:  run  bash scripts/gen_config.sh  first"
-  exit 1
-fi
+CONFIG=""
+PORT="8000"
+SERVER_TAG="vllm-local"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config)     CONFIG="$2";     shift 2 ;;
+        --port)       PORT="$2";       shift 2 ;;
+        --server-tag) SERVER_TAG="$2"; shift 2 ;;
+        *) echo "Unknown argument: $1"; usage ;;
+    esac
+done
+
+[[ -z "$CONFIG" ]] && { echo "Error: --config is required"; usage; }
+
+BASENAME=$(basename "$CONFIG" .json)
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+RUN_LABEL="${BASENAME}_${TIMESTAMP}"
+OUTPUT="results/${RUN_LABEL}.json"
+
+mkdir -p results
 
 openclaw-bench simulate \
-  --config "$CONFIG" \
-  --output "results/openclaw_${PROFILE}_$(date +%Y-%m-%d_%H-%M-%S).json" \
-  --run-label "run-${PROFILE}" \
-  --server-label "$SERVER_LABEL" \
-  --base-url http://localhost:17888
+    --config "$CONFIG" \
+    --base-url "http://localhost:${PORT}" \
+    --server-label "$SERVER_TAG" \
+    --run-label "$RUN_LABEL" \
+    --output "$OUTPUT"
